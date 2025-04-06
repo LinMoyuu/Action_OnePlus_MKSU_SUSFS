@@ -5,11 +5,11 @@ on:
       CPU:
         description: "分支"
         required: true
-        default: 'sm8650'
+        default: 'sm7675'
       FEIL:
         description: "配置文件"
         required: true
-        default: 'oneplus_ace3_pro_v'
+        default: 'gtneo6se'
       CPUD:
         description: "处理器代号"
         required: true
@@ -90,7 +90,7 @@ jobs:
       - name: Initialize repo and sync
         run: |
          mkdir kernel_workspace && cd kernel_workspace
-         repo init -u https://github.com/OnePlusOSS/kernel_manifest.git -b refs/heads/oneplus/${{ github.event.inputs.CPU }} -m ${{ github.event.inputs.FEIL }}.xml --depth=1
+         repo init -u https://github.com/LinMoyu233/kernel_manifest.git -b realme/${{ github.event.inputs.CPU }} -m ${{ github.event.inputs.FEIL }}.xml --depth=1
          repo sync
          rm kernel_platform/common/android/abi_gki_protected_exports_* || echo "No protected exports!"
          rm kernel_platform/msm-kernel/android/abi_gki_protected_exports_* || echo "No protected exports!"
@@ -138,7 +138,7 @@ jobs:
           cd ./common
           patch -p1 < 50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch || true
           echo "完成"
-          
+
       - name: Apply Hide Stuff Patches
         if: ${{ github.event.inputs.SUSFS_ENABLED == 'true' }}
         run: |
@@ -146,6 +146,10 @@ jobs:
           cp ../../SukiSU_patch/69_hide_stuff.patch ./
           echo "正在打隐藏应用补丁"
           patch -p1 -F 3 < 69_hide_stuff.patch
+          echo "lz4 patch"
+          patch -p1 < ../../.repo/manifests/patches/001-lz4.patch
+          echo "zstd patch"
+          patch -p1 < ../../.repo/manifests/patches/002-zstd.patch
          
       - name: Apply New Hooks Patches
         if: ${{ github.event.inputs.VFS_patch_ENABLED == 'enable' }}
@@ -228,11 +232,7 @@ jobs:
       - name: Build kernel
         run: |
           cd kernel_workspace
-          if [[ "${{ github.event.inputs.CPU }}" == "sm8650" || "${{ github.event.inputs.CPU }}" == "sm8750" ]]; then
-            ./kernel_platform/build_with_bazel.py -t ${{ github.event.inputs.CPUD }} gki --action_env=KSU_VERSION
-          else
-            LTO=thin ./kernel_platform/oplus/build/oplus_build_kernel.sh ${{ github.event.inputs.CPUD }} gki
-          fi
+          ./kernel_platform/build_with_bazel.py -t ${{ github.event.inputs.CPUD }} gki --action_env=KSU_VERSION
          
       - name: Make AnyKernel3
         run: |
