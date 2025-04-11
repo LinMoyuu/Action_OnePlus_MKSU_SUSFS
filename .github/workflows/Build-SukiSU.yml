@@ -66,6 +66,7 @@ jobs:
         with:
           root-reserve-mb: 8192
           temp-reserve-mb: 2048
+          swap-size-mb: 8192
           remove-dotnet: 'true'
           remove-android: 'true'
           remove-haskell: 'true'
@@ -96,6 +97,7 @@ jobs:
          rm kernel_platform/msm-kernel/android/abi_gki_protected_exports_* || echo "No protected exports!"
          sed -i 's/ -dirty//g' kernel_platform/common/scripts/setlocalversion
          sed -i 's/ -dirty//g' kernel_platform/msm-kernel/scripts/setlocalversion
+         sed -i 's/ -dirty//g' kernel_platform/external/dtc/scripts/setlocalversion
       
       - name: KernelSU & SukiSU version
         if: ${{ github.event.inputs.kernelsu_variant == 'Official' || github.event.inputs.kernelsu_variant == 'SukiSU' }}
@@ -122,6 +124,11 @@ jobs:
         run: |
           cd kernel_workspace
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}
+          if [[ "${{ github.event.inputs.KERNEL_VERSION }}" == "6.1" ]]; then
+            cd susfs4ksu
+            git reset --hard HEAD~1
+            cd ..
+          fi
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
           cd kernel_platform
 
@@ -129,10 +136,6 @@ jobs:
           cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}.patch ./common/
           cp ../susfs4ksu/kernel_patches/fs/* ./common/fs/
           cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
-          # zram lz4kd
-          #cp -r ../SukiSU_patch/other/lz4k/include/linux/* ./common/include/linux
-          #cp -r ../SukiSU_patch/other/lz4k/lib/* ./common/lib
-          #cp -r ../SukiSU_patch/other/lz4k/crypto/* ./common/crypto
           
           echo "正在给内核打susfs补丁"
           cd ./common
@@ -197,29 +200,6 @@ jobs:
           echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> ./common/arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/gki_defconfig
-
-          #if [ "${{ github.event.inputs.KERNEL_VERSION }}" != "6.6" ] && [ "${{ github.event.inputs.KERNEL_VERSION }}" != "5.10" ]; then
-          #  sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' ./common/arch/arm64/configs/gki_defconfig
-          #  sed -i 's/CONFIG_ZSMALLOC=m/CONFIG_ZSMALLOC=y/g' ./common/arch/arm64/configs/gki_defconfig
-          #  sed -i 's/CONFIG_MODULE_SIG=y/CONFIG_MODULE_SIG=n/g' ./common/arch/arm64/configs/gki_defconfig
-          #  echo "CONFIG_ZRAM_WRITEBACK=y" >> ./common/arch/arm64/configs/gki_defconfig
-          #  echo "CONFIG_CRYPTO_LZ4K=y" >> ./common/arch/arm64/configs/gki_defconfig
-          #  echo "CONFIG_CRYPTO_LZ4KD=y" >> ./common/arch/arm64/configs/gki_defconfig
-          #  echo "CONFIG_CRYPTO_LZ4HC=y" >> ./common/arch/arm64/configs/gki_defconfig
-          #  echo "CONFIG_CRYPTO_842=y" >> ./common/arch/arm64/configs/gki_defconfig
-          #fi
-
-          #if [ "${{ github.event.inputs.KERNEL_VERSION }}" = "6.6" ]; then
-          #  echo "CONFIG_ZSMALLOC=y" >> ./common/arch/arm64/configs/gki_defconfig
-          #  echo "CONFIG_ZRAM_WRITEBACK=y" >> ./common/arch/arm64/configs/gki_defconfig
-          #  sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' ./common/arch/arm64/configs/gki_defconfig
-          #  echo "CONFIG_ZRAM_WRITEBACK=y" >> ./common/arch/arm64/configs/gki_defconfig
-          #  echo "CONFIG_CRYPTO_LZ4K=y" >> ./common/arch/arm64/configs/gki_defconfig
-          #  echo "CONFIG_CRYPTO_LZ4KD=y" >> ./common/arch/arm64/configs/gki_defconfig
-          #  echo "CONFIG_CRYPTO_LZ4HC=y" >> ./common/arch/arm64/configs/gki_defconfig
-          #  echo "CONFIG_CRYPTO_842=y" >> ./common/arch/arm64/configs/gki_defconfig
-          #fi
-
           
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
@@ -227,7 +207,9 @@ jobs:
       - name: Add make name
         run: |
          cd kernel_workspace/kernel_platform
-           sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
+           if [[ "${{ github.event.inputs.CPU }}" == "sm8650" || "${{ github.event.inputs.CPU }}" == "sm8750" ]]; then
+             sed -i "/stable_scmversion_cmd/s/-maybe-dirty//g" ./build/kernel/kleaf/impl/stamp.bzl
+           fi
            sed -i '$s|echo "\$res"|echo "\${{ github.event.inputs.KERNEL_NAME }}"|' ./common/scripts/setlocalversion
   
       - name: Build kernel
@@ -237,41 +219,46 @@ jobs:
          
       - name: Make AnyKernel3
         run: |
-          # 克隆 AnyKernel3 仓库
           git clone https://github.com/Kernel-SU/AnyKernel3 --depth=1
           rm -rf ./AnyKernel3/.git
-
-          # 定义目录路径
           dir1="./kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/dist/"
           dir2="./kernel_workspace/kernel_platform/common/out/arch/arm64/boot/"
+          dir3="./kernel_workspace/kernel_platform/out/msm-${{ github.event.inputs.CPUD }}-${{ github.event.inputs.CPUD }}-gki/dist/"
           target1="./AnyKernel3/"
           target2="./kernel_workspace/kernel"
 
-          # 在第一个目录中查找 Image 文件
           if find "$dir1" -name "Image" | grep -q "Image"; then
-            echo "文件 Image 在dist目录中"
-            cp "$dir1"Image "$target1"
-            cp "$dir1"Image "$target2"
+            image_path="$dir1"Image
+          elif find "$dir2" -name "Image" | grep -q "Image"; then
+            image_path="$dir2"Image
+          elif find "$dir3" -name "Image" | grep -q "Image"; then
+            image_path="$dir3"Image
           else
-            # 在第二个目录中查找 Image 文件
-            if find "$dir2" -name "Image" | grep -q "Image"; then
-              echo "文件 Image 在arch/arm64/boot目录中"
-              cp "$dir2"Image "$target1"
-              cp "$dir2"Image "$target2"
-            else
-              # 在 kernel_workspace/kernel_platform/common/out/ 的所有子目录中查找 Image 文件
-              echo "在 kernel_workspace/kernel_platform/common/out/ 的所有子目录中查找 Image 文件"
-              image_path=$(find "./kernel_workspace/kernel_platform/common/out/" -name "Image" | head -n 1)
-              
-              if [ -n "$image_path" ]; then
-                echo "找到 Image 文件: $image_path"
-                cp "$image_path" "$target1"
-                cp "$image_path" "$target2"
-              else
-                echo "在所有目录中未找到 Image 文件，构建可能失败"
-              fi
-            fi
+            image_path=$(find "./kernel_workspace/kernel_platform/common/out/" -name "Image" | head -n 1)
           fi
+
+          if [ -n "$image_path" ] && [ -f "$image_path" ]; then
+            mkdir -p "$dir1"
+            if [ "$(realpath "$image_path")" != "$(realpath "$dir1"Image)" ]; then
+              cp "$image_path" "$dir1"
+            else
+              echo "源文件与目标相同，跳过复制"
+            fi
+          else
+            echo "未找到 Image 文件，构建可能失败"
+            exit 1
+          fi
+
+      - name: Apply patch_linux and replace Image
+        run: |
+          cd kernel_workspace/kernel_platform/out/msm-kernel-${{ github.event.inputs.CPUD }}-gki/dist
+          curl -LO https://github.com/ShirkNeko/SukiSU_KernelPatch_patch/releases/download/0.11-beta/patch_linux
+          chmod +x patch_linux
+          ./patch_linux
+          rm -f Image
+          mv oImage Image
+          cp Image $GITHUB_WORKSPACE/AnyKernel3/Image
+          cp Image $GITHUB_WORKSPACE/kernel_workspace/kernel
          
          
       - name: Upload AnyKernel3
