@@ -124,11 +124,6 @@ jobs:
         run: |
           cd kernel_workspace
           git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-${{ github.event.inputs.ANDROID_VERSION }}-${{ github.event.inputs.KERNEL_VERSION }}
-          if [[ "${{ github.event.inputs.KERNEL_VERSION }}" == "6.1" ]]; then
-            cd susfs4ksu
-            git reset --hard HEAD~1
-            cd ..
-          fi
           git clone https://github.com/ShirkNeko/SukiSU_patch.git
           cd kernel_platform
 
