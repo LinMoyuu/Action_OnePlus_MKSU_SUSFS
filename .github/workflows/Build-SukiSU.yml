@@ -8,7 +8,6 @@ on:
         type: choice
         options:
           - sm7675_v
-          - sm7675_u
       FEIL:
         description: "配置文件"
         required: true
