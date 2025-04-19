@@ -1,15 +1,18 @@
-name: Build OnePlus_Kernel
+name: Build Kernel
 on:
   workflow_dispatch:
     inputs:
       CPU:
         description: "分支"
         required: true
-        default: 'sm7675'
+        type: choice
+        options:
+          - sm7675_v
+          - sm7675_u
       FEIL:
         description: "配置文件"
         required: true
-        default: 'gtneo6se'
+        default: 'GTNeo6SE'
       CPUD:
         description: "处理器代号"
         required: true
@@ -54,7 +57,7 @@ on:
         options:
           - enable
           - disable
-        default: enable
+        默认: enable
 jobs:
   build:
     runs-on: ubuntu-latest
