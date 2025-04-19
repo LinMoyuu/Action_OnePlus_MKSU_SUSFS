@@ -244,7 +244,8 @@ jobs:
           # Remove check_defconfig
           sed -i 's/check_defconfig//' ./common/build.config.gki
 
-      - name: Add make name
+      - name: 添加 make name
+        if: ${{ github.event.inputs.cpu == 'sm7675_v' }}
         run: |
          cd kernel_workspace/kernel_platform
            if [[ "${{ github.event.inputs.KERNEL_VERSION }}" == "6.1" || "${{ github.event.inputs.KERNEL_VERSION }}" == "6.6" ]]; then
