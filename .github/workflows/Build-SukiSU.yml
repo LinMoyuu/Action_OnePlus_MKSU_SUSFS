@@ -154,6 +154,9 @@ jobs:
           cp ../susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
 
           if [ "${{ github.event.inputs.ZRAM }}" = "true" ]; then
+          echo "lz4 & zstd updates"
+          patch -p1 < ../.repo/manifests/patches/001-lz4.patch || true
+          patch -p1 < ../.repo/manifests/patches/002-zstd.patch || true
           echo "正在给内核打zram补丁"
           cp -r ../SukiSU_patch/other/zram/lz4k/include/linux/* ./common/include/linux
           cp -r ../SukiSU_patch/other/zram/lz4k/lib/* ./common/lib
@@ -191,20 +194,6 @@ jobs:
             patch -p1 -F 3 < lz4kd.patch || true
             echo '完成LZ4KD补丁'
           fi
-          
-      - name: Apply LZ4
-        run: |
-          cd kernel_workspace/kernel_platform/common
-          echo "正在打LZ4补丁"
-          patch -p1 < ../../.repo/manifests/patches/001-lz4.patch || true
-          echo '完成LZ4补丁'
-          
-      - name: Apply ZSTD
-        run: |
-          cd kernel_workspace/kernel_platform/common
-          echo "正在打ZSTD补丁"
-          patch -p1 < ../../.repo/manifests/patches/002-zstd.patch || true
-          echo '完成ZSTD补丁'
           
       # 配置信息
       - name: Add Configuration Settings
